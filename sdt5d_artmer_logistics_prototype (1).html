@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SDT5D / ArtMer — Logistics Digital Twin</title>
+<style>
+:root{--bg:#06121b;--panel:rgba(7,23,34,.92);--line:rgba(104,220,237,.22);--cyan:#6ce8f1;--blue:#4e9ebc;--orange:#ff9b43;--muted:#8ba8b7;--white:#eafaff}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--white);font:12px/1.4 Inter,Segoe UI,Arial,sans-serif}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block}
+.vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 48%,transparent 35%,rgba(2,8,13,.28) 100%),linear-gradient(90deg,rgba(2,12,19,.8),transparent 23%,transparent 76%,rgba(2,12,19,.55))}
+.topbar{position:fixed;z-index:10;top:12px;left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:none}
+.brand{display:flex;align-items:center;gap:10px;text-shadow:0 2px 12px #000;pointer-events:auto}.logo{width:34px;height:34px;border:1px solid #70eaf3;border-radius:9px;display:grid;place-items:center;color:var(--cyan);font-weight:800;box-shadow:0 0 20px #39cde533,inset 0 0 14px #39cde522}
+.brand strong{letter-spacing:.17em;font-size:13px}.brand small{display:block;color:#83a8b7;letter-spacing:.12em;font-size:9px}
+.status{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;pointer-events:auto}.pill{padding:7px 10px;background:#061923c9;border:1px solid var(--line);border-radius:5px;color:#b7d9e1;backdrop-filter:blur(12px);letter-spacing:.08em;font-size:9px}.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#65f3bf;margin-right:6px;box-shadow:0 0 9px #65f3bf}
+/* Floating panels – draggable, hideable, consistent chrome */
+.panel{position:fixed;z-index:5;background:linear-gradient(145deg,rgba(8,27,40,.94),rgba(4,15,24,.88));border:1px solid var(--line);box-shadow:0 12px 40px #0006,inset 0 1px #ffffff08;backdrop-filter:blur(16px);border-radius:8px;min-width:180px;touch-action:none}
+.panel-head{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:#0c2a39;border-bottom:1px solid var(--line);cursor:move;color:var(--cyan);font-size:9px;letter-spacing:.14em;user-select:none;border-radius:8px 8px 0 0}
+.panel-body{padding:12px 14px;overflow:auto}
+.panel-tools{display:flex;gap:4px}
+.mini-btn{width:22px;height:20px;background:#102f3e;color:#c5f5fa;border:1px solid #4ec8d344;border-radius:3px;cursor:pointer;font-size:11px;line-height:1;display:grid;place-items:center}
+.mini-btn:hover{border-color:var(--cyan);color:#fff}
+.panel-grip{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 45%,#6ce8f1 47%,#6ce8f1 53%,transparent 55%,transparent 68%,#6ce8f1 70%,#6ce8f1 76%,transparent 78%)}
+.left{left:14px;top:72px;width:240px;max-height:calc(100vh - 140px)}
+.right{right:14px;top:72px;width:260px;max-height:calc(100vh - 140px)}
+.bottom{left:50%;transform:translateX(-50%);bottom:14px;width:min(640px,90vw);padding:0;display:flex;flex-direction:column}
+.bottom .panel-body{display:flex;align-items:center;gap:12px;padding:10px 14px}
+.cam-panel{left:14px;bottom:14px;width:210px;z-index:6}
+.kicker{color:var(--cyan);font-size:9px;letter-spacing:.2em;text-transform:uppercase}.section{margin-top:14px;padding-top:10px;border-top:1px solid #75dce21b}.section h3{font-size:10px;letter-spacing:.13em;color:#c9e9ef;margin:0 0 8px;text-transform:uppercase}.metric{display:flex;justify-content:space-between;gap:8px;margin:7px 0;color:#8daeb9}.metric b{color:#e7fbff;font-weight:600}.layer{display:flex;align-items:center;gap:8px;padding:6px 0;color:#c1d9df}.layer input{accent-color:#62e8ef}
+.btnrow{display:flex;gap:5px;flex-wrap:wrap}.btn{cursor:pointer;border:1px solid #66dbe344;background:#0b2938;color:#bdebf1;padding:6px 9px;border-radius:4px;font-size:10px}.btn:hover,.btn.active{border-color:#6ce8f1;background:#124052;color:#fff;box-shadow:0 0 12px #43d9e222}.btn.orange{border-color:#ff9b4355;color:#ffc18b}.btn.orange.active{background:#4b2a13}
+.progress{height:4px;background:#14313d;border-radius:8px;overflow:hidden;margin-top:6px}.progress span{display:block;height:100%;width:72%;background:linear-gradient(90deg,#4db9d6,#ff9b43);box-shadow:0 0 12px #61dff1}
+.legend{display:flex;align-items:center;gap:7px;color:#8eacb7;font-size:9px;margin:6px 0}.legend i{width:18px;height:2px;background:var(--cyan);box-shadow:0 0 6px currentColor}.legend i.orange{background:var(--orange);color:var(--orange)}.legend i.dash{background:repeating-linear-gradient(90deg,#72e7f4 0 3px,transparent 3px 6px)}
+.timeline{flex:1;min-width:80px}.timeline .label{display:flex;justify-content:space-between;color:#8eacb7;font-size:9px}.timeline input{width:100%;accent-color:#68e4ef}
+.hint{position:fixed;z-index:2;right:14px;bottom:90px;color:#9fc4cf;font-size:10px;text-align:right;text-shadow:0 2px 6px #000;pointer-events:none}
+#toast{position:fixed;z-index:20;left:50%;top:68px;transform:translateX(-50%);background:#0b2938;border:1px solid #69e4ee66;padding:9px 14px;border-radius:5px;opacity:0;transition:opacity .2s;pointer-events:none}
+.mini-map{z-index:7;right:280px;top:78px;width:300px;min-width:200px;max-width:70vw;padding:0;overflow:hidden}
+#mapCanvas{display:block;width:100%;height:170px;background:#071923}
+.map-foot{display:flex;align-items:center;gap:12px;padding:6px 9px;color:#9bbdc7;font-size:8px}
+.map-foot span{display:flex;align-items:center;gap:5px}
+.map-dot{width:6px;height:6px;border-radius:50%;display:inline-block}.map-dot.cyan{background:#62e8f1}.map-dot.orange{background:#ff9b43}
+.restore-btn{position:fixed;z-index:6;padding:7px 11px;color:var(--cyan);cursor:pointer;font-size:10px}
+.restore-btn[hidden],.panel[hidden]{display:none!important}
+.cam-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px}
+.cam-grid .btn{text-align:center;padding:6px 4px}
+@media(max-width:900px){.left,.right{max-height:40vh}.cam-panel{display:none}.mini-map{right:10px;top:64px;width:220px}#mapCanvas{height:130px}.status .pill:nth-child(n+3){display:none}.hint{display:none}}
+@media(max-width:560px){.left{width:170px}.right{width:170px}.brand strong{font-size:11px}.bottom{width:96vw}}
+</style>
+</head>
+
+<body>
+<canvas id="scene"></canvas><div class="vignette"></div>
+<header class="topbar">
+ <div class="brand"><div class="logo">5D</div><div><strong>SDT5D <span style="color:#6ce8f1">/</span> ARTMER</strong><small>LOGISTICS DIGITAL TWIN · PROTOTYPE 0.4</small></div></div>
+ <div class="status">
+  <div class="pill"><span class="dot"></span>WORLD STATE: SIMULATED</div>
+  <div class="pill">FRAME <span id="fps">60</span> FPS</div>
+  <div class="pill">UTC <span id="clock">--:--:--</span></div>
+  <button class="btn" id="dayNight">☾ Night</button>
+  <button class="btn" id="fullscreen">⛶ Fullscreen</button>
+ </div>
+</header>
+
+<!-- LEFT: Territory Intelligence (floating) -->
+<aside id="panelLeft" class="panel left">
+ <div class="panel-head" data-drag="panelLeft"><span>▦ TERRITORY</span>
+  <div class="panel-tools"><button class="mini-btn" data-hide="panelLeft" title="Hide">—</button></div>
+ </div>
+ <div class="panel-body">
+  <div class="kicker">Territory intelligence</div>
+  <h2 style="font-size:16px;margin:4px 0 0">Logistics Hub 01</h2>
+  <div style="color:#83a5b3;font-size:10px;margin-top:3px">Industrial district · synthetic scene</div>
+  <div class="section"><h3>World layers</h3>
+   <label class="layer"><input type="checkbox" data-layer="terrain" checked> Terrain / grid</label>
+   <label class="layer"><input type="checkbox" data-layer="buildings" checked> Warehouses</label>
+   <label class="layer"><input type="checkbox" data-layer="vehicles" checked> Vehicles & cargo</label>
+   <label class="layer"><input type="checkbox" data-layer="routes" checked> Flow trajectories</label>
+   <label class="layer"><input type="checkbox" data-layer="signals" checked> IoT signal field</label>
+  </div>
+  <div class="section"><h3>Territory metrics</h3>
+   <div class="metric"><span>Terminal utilization</span><b id="util">72%</b></div>
+   <div class="progress"><span id="utilbar"></span></div>
+   <div class="metric"><span>Vehicles in scene</span><b>08</b></div>
+   <div class="metric"><span>Active routes</span><b>04</b></div>
+   <div class="metric"><span>Signal nodes</span><b>148</b></div>
+   <div class="metric"><span>Model confidence</span><b>SIM / 0.94</b></div>
+  </div>
+ </div>
+ <div class="panel-grip" data-resize="panelLeft"></div>
+</aside>
+<button id="restoreLeft" class="panel restore-btn" style="left:14px;top:72px" hidden>▦ Territory</button>
+
+<!-- RIGHT: Mission / Flow (floating) -->
+<aside id="panelRight" class="panel right">
+ <div class="panel-head" data-drag="panelRight"><span>▦ MISSION / FLOW</span>
+  <div class="panel-tools"><button class="mini-btn" data-hide="panelRight" title="Hide">—</button></div>
+ </div>
+ <div class="panel-body">
+  <div class="kicker">Mission / flow</div>
+  <h2 style="font-size:15px;margin:4px 0 0">Cargo distribution</h2>
+  <div style="color:#83a5b3;font-size:10px;margin-top:3px">Live simulation · synthetic data</div>
+  <div class="section"><h3>Current scenario</h3>
+   <div class="metric"><span>Scenario</span><b id="scenarioName">Balanced flow</b></div>
+   <div class="metric"><span>Dispatch rate</span><b id="dispatch">42 / h</b></div>
+   <div class="metric"><span>Queue risk</span><b id="risk" style="color:#8ff0c0">LOW</b></div>
+   <div class="btnrow">
+    <button class="btn active" data-scenario="balanced">Balanced</button>
+    <button class="btn" data-scenario="surge">Surge</button>
+    <button class="btn" data-scenario="disruption">Disruption</button>
+   </div>
+  </div>
+  <div class="section"><h3>Signal legend</h3>
+   <div class="legend"><i></i> Spatial grid / boundary</div>
+   <div class="legend"><i class="orange"></i> Active cargo route</div>
+   <div class="legend"><i class="dash"></i> Telemetry / signal link</div>
+  </div>
+  <div class="section"><h3>Selected object</h3>
+   <div class="metric"><span>Entity</span><b id="entity">TRK-04</b></div>
+   <div class="metric"><span>State</span><b id="entityState">IN TRANSIT</b></div>
+   <div class="metric"><span>Velocity</span><b id="velocity">24 km/h</b></div>
+   <div class="metric"><span>Provenance</span><b>SYNTHETIC</b></div>
+  </div>
+  <div class="section"><h3>Scene actions</h3>
+   <div class="btnrow">
+    <button class="btn" id="toggleMotion">Pause motion</button>
+    <button class="btn orange" id="pulse">Pulse routes</button>
+   </div>
+  </div>
+  <div class="section"><h3>Debug (P0)</h3>
+   <label class="layer"><input type="checkbox" id="chkCollisions"> Show collision warnings</label>
+   <div class="btnrow" style="margin-top:8px">
+    <button class="btn" id="btnValidate">Validate layout</button>
+   </div>
+  </div>
+  <div class="section"><h3>Global context</h3>
+   <div class="metric"><span>Network</span><b>🌍 Multi-hub</b></div>
+   <div class="metric"><span>Linked sites</span><b>3 active</b></div>
+   <div class="metric"><span>Data fabric</span><b>SYNTHETIC</b></div>
+  </div>
+ </div>
+ <div class="panel-grip" data-resize="panelRight"></div>
+</aside>
+<button id="restoreRight" class="panel restore-btn" style="right:14px;top:72px" hidden>▦ Mission</button>
+
+<!-- BOTTOM: Timeline (floating) -->
+<div id="panelBottom" class="panel bottom">
+ <div class="panel-head" data-drag="panelBottom"><span>▦ SIMULATION TIMELINE</span>
+  <div class="panel-tools"><button class="mini-btn" data-hide="panelBottom" title="Hide">—</button></div>
+ </div>
+ <div class="panel-body">
+  <button class="btn" id="play">Ⅱ Pause</button>
+  <div class="timeline">
+   <div class="label"><span>T+</span><span id="timeLabel">00:24</span></div>
+   <input id="time" type="range" min="0" max="100" value="24">
+  </div>
+  <div class="btnrow">
+   <button class="btn" id="speed">×1</button>
+   <button class="btn" id="gridBtn">Grid ON</button>
+  </div>
+ </div>
+</div>
+<button id="restoreBottom" class="panel restore-btn" style="left:50%;transform:translateX(-50%);bottom:14px" hidden>▦ Timeline</button>
+
+<!-- CAMERA CONTROLS (floating) -->
+<aside id="panelCam" class="panel cam-panel">
+ <div class="panel-head" data-drag="panelCam"><span>▦ CAMERA</span>
+  <div class="panel-tools"><button class="mini-btn" data-hide="panelCam" title="Hide">—</button></div>
+ </div>
+ <div class="panel-body">
+  <div class="btnrow">
+   <button class="btn active" data-camera="orbit">Orbit</button>
+   <button class="btn" data-camera="top">Top</button>
+   <button class="btn" data-camera="ground">Ground</button>
+  </div>
+  <div class="cam-grid">
+   <button class="btn" id="camZoomIn" title="Zoom in">＋</button>
+   <button class="btn" id="camUp" title="Pan up">↑</button>
+   <button class="btn" id="camZoomOut" title="Zoom out">－</button>
+   <button class="btn" id="camLeft" title="Pan left">←</button>
+   <button class="btn" id="reset">⌂</button>
+   <button class="btn" id="camRight" title="Pan right">→</button>
+   <span></span>
+   <button class="btn" id="camDown" title="Pan down">↓</button>
+   <span></span>
+  </div>
+  <div class="metric" style="margin-top:8px"><span>Drag</span><span>Orbit</span></div>
+  <div class="metric"><span>Wheel</span><span>Zoom</span></div>
+  <div class="metric"><span>Right-drag</span><span>Pan</span></div>
+ </div>
+</aside>
+<button id="restoreCam" class="panel restore-btn" style="left:14px;bottom:14px" hidden>▦ Camera</button>
+
+<div class="hint">DRAG PANELS BY HEADER · RESIZE VIA CORNER · HIDE / RESTORE<br>SCENE GEOMETRY AND METRICS ARE SYNTHETIC</div>
+
+<!-- MINI-MAP (floating) -->
+<section id="miniMap" class="panel mini-map" aria-label="Territory mini-map">
+ <div id="mapHead" class="panel-head" data-drag="miniMap"><span>▦ TERRITORY MAP</span>
+  <div class="panel-tools">
+   <button class="mini-btn" id="mapUploadBtn" title="Load map image">↑</button>
+   <button class="mini-btn" id="mapResize" title="Toggle size">↗</button>
+   <button class="mini-btn" id="mapHide" title="Hide">—</button>
+   <input id="mapUpload" type="file" accept="image/*" hidden>
+  </div>
+ </div>
+ <canvas id="mapCanvas" width="320" height="210"></canvas>
+ <div class="map-foot">
+  <span><i class="map-dot cyan"></i>Infrastructure</span>
+  <span><i class="map-dot orange"></i>Vehicles</span>
+ </div>
+ <div id="mapGrip" class="panel-grip" data-resize="miniMap"></div>
+</section>
+<button id="mapRestore" class="panel restore-btn" style="right:14px;top:78px" hidden>▦ Mini-map</button>
+
+<div id="toast"></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const canvas=document.querySelector('#scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();scene.background=new THREE.Color('#071722');scene.fog=new THREE.FogExp2('#071722',.0145);
+const camera=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.1,600);
+const target=new THREE.Vector3(0,0,0);let radius=68,theta=.78,phi=1.02;
+function updateCamera(){phi=Math.max(.18,Math.min(1.48,phi));camera.position.set(target.x+radius*Math.sin(phi)*Math.sin(theta),target.y+radius*Math.cos(phi),target.z+radius*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
+updateCamera();
+
+scene.add(new THREE.HemisphereLight(0x9adce7,0x0a1720,2.1));
+const key=new THREE.DirectionalLight(0xd5f6ff,3.2);key.position.set(-25,45,20);key.castShadow=true;key.shadow.mapSize.set(2048,2048);scene.add(key);
+const rim=new THREE.DirectionalLight(0x2a91bc,2.2);rim.position.set(25,22,-30);scene.add(rim);
+const orangeLight=new THREE.PointLight(0xff8b38,32,65);orangeLight.position.set(0,8,0);scene.add(orangeLight);
+const mats={
+ ground:new THREE.MeshStandardMaterial({color:0x0a1e28,roughness:.78,metalness:.22}),
+ concrete:new THREE.MeshStandardMaterial({color:0x263943,roughness:.8,metalness:.12}),
+ wall:new THREE.MeshStandardMaterial({color:0x304650,roughness:.63,metalness:.25}),
+ roof:new THREE.MeshStandardMaterial({color:0x172b35,roughness:.62,metalness:.28}),
+ glass:new THREE.MeshPhysicalMaterial({color:0x174c5c,metalness:.35,roughness:.2,transparent:true,opacity:.78}),
+ white:new THREE.MeshStandardMaterial({color:0xb9cbd0,roughness:.4,metalness:.3}),
+ cyan:new THREE.MeshBasicMaterial({color:0x60eafa}),
+ glowCyan:new THREE.MeshBasicMaterial({color:0x5ef0ff,transparent:true,opacity:.85}),
+ glowEdge:new THREE.MeshBasicMaterial({color:0x3de8f5,transparent:true,opacity:.55}),
+ hologram:new THREE.MeshBasicMaterial({color:0x7af6ff,transparent:true,opacity:.35,depthWrite:false}),
+ orange:new THREE.MeshBasicMaterial({color:0xff963f}),
+ truck:new THREE.MeshStandardMaterial({color:0x9caeb4,roughness:.42,metalness:.45}),
+ tire:new THREE.MeshStandardMaterial({color:0x071014,roughness:.9}),
+ cargo:new THREE.MeshStandardMaterial({color:0x355e69,roughness:.65,metalness:.2})
+};
+const world=new THREE.Group();scene.add(world);
+const layers={terrain:true,buildings:true,vehicles:true,routes:true,signals:true};
+function box(parent,w,h,d,mat,x,y,z,cast=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;parent.add(m);return m}
+function line(parent,pts,color=0x60eafa,opacity=.6){const g=new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(...p)));const m=new THREE.Line(g,new THREE.LineBasicMaterial({color,transparent:true,opacity}));parent.add(m);return m}
+const ground=box(world,150,.8,110,mats.ground,0,-.5,0,false);ground.receiveShadow=true;
+const terrainGroup=new THREE.Group();world.add(terrainGroup);
+const grid=new THREE.GridHelper(150,75,0x3cb8ce,0x1c7187);grid.position.y=-.07;grid.material.transparent=true;grid.material.opacity=.32;terrainGroup.add(grid);
+const boundaryPts=[[-68,.03,-48],[68,.03,-48],[68,.03,48],[-68,.03,48],[-68,.03,-48]];
+line(terrainGroup,boundaryPts,0x52dceb,.55);
+// Ground lane strips
+for(let z=-38;z<=38;z+=12){box(terrainGroup,135,.025,.16,new THREE.MeshBasicMaterial({color:0x153c4a}),0,.02,z,false)}
+// Loading apron
+box(terrainGroup,78,.12,32,mats.concrete,0,.04,7,false);
+for(let i=0;i<12;i++){const x=-35+i*6;box(terrainGroup,.12,.03,22,new THREE.MeshBasicMaterial({color:0x7eb6be,transparent:true,opacity:.25}),x,.12,7,false)}
+// Warehouse rows
+const buildingGroup=new THREE.Group();world.add(buildingGroup);
+function warehouse(x,z,w,d,h,idx){
+ const g=new THREE.Group();g.position.set(x,0,z);buildingGroup.add(g);
+ box(g,w,h,d,mats.wall,0,h/2,0);
+ box(g,w+.4,.5,d+.4,mats.roof,0,h+.2,0);
+ // roof ribs
+ for(let xx=-w/2+1;xx<w/2;xx+=2.2)box(g,.09,.08,d-.6,mats.white,xx,h+.48,0,false);
+ // side clerestory windows
+ for(let xx=-w/2+1;xx<w/2-1;xx+=2.8)box(g,.8,1.1,.04,mats.glass,xx,h*.63,d/2+.025,false);
+ // loading doors facing apron
+ for(let xx=-w/2+1.6;xx<w/2-1;xx+=3.5){
+   box(g,1.8,3.2,.08,mats.glass,xx,1.7,d/2+.06,false);
+   box(g,2,.1,.12,mats.cyan,xx,.1,d/2+.12,false);
+ }
+ // luminous perimeter corners
+ const y=.08;
+ line(g,[[-w/2,y,-d/2],[w/2,y,-d/2],[w/2,y,d/2],[-w/2,y,d/2],[-w/2,y,-d/2]],0x55ddec,.35);
+ const sign=box(g,Math.min(7,w*.3),.35,.08,mats.cyan,0,h*.68,d/2+.08,false);
+ sign.material=new THREE.MeshBasicMaterial({color:0x2b9eb0});
+ return g;
+}
+// Warehouses positioned with clear clearance from the one-way perimeter road (min ~6–8 units).
+// WH footprints stay inside the apron / yard so trucks never clip walls or roofs.
+warehouse(-32,-22,32,18,10,1);
+warehouse(14,-26,36,22,12,2);
+warehouse(38,10,24,18,9,3);
+const office=box(buildingGroup,12,8,9,mats.glass,-48,4,8);box(buildingGroup,13,.5,10,mats.roof,-48,8.2,8);
+for(let i=0;i<4;i++)box(buildingGroup,1.5,2.5,.08,mats.cyan,-52+i*2.7,4.2,12.55,false);
+
+// ---------- Static layout helpers (must be before cargo placement) ----------
+const YARD = { xMin: -28, xMax: 28, zMin: 10, zMax: 32 };
+const CLEARANCE = 1.8;
+const staticAABBs = [];
+function registerStatic(x, z, halfW, halfD, label) {
+  const aabb = { minX: x - halfW, maxX: x + halfW, minZ: z - halfD, maxZ: z + halfD, label };
+  staticAABBs.push(aabb);
+  return aabb;
+}
+function aabbOverlap(a, b, pad = 0) {
+  return a.minX < b.maxX + pad && a.maxX > b.minX - pad && a.minZ < b.maxZ + pad && a.maxZ > b.minZ - pad;
+}
+function validateStaticLayout() {
+  const violations = [];
+  for (let i = 0; i < staticAABBs.length; i++) {
+    for (let j = i + 1; j < staticAABBs.length; j++) {
+      if (aabbOverlap(staticAABBs[i], staticAABBs[j], CLEARANCE * 0.5)) {
+        violations.push(`${staticAABBs[i].label} overlaps ${staticAABBs[j].label}`);
+      }
+    }
+  }
+  return violations;
+}
+// Register main buildings for layout validation
+registerStatic(-32, -22, 16, 9, 'WH-01');
+registerStatic(14, -26, 18, 11, 'WH-02');
+registerStatic(38, 10, 12, 9, 'WH-03');
+registerStatic(-48, 8, 6, 5, 'Office');
+
+// Smart cargo containers — central apron, clear of driving lanes.
+// Visual language from reference: cyan holographic frames + ID markers.
+const cargoGroup=new THREE.Group();world.add(cargoGroup);
+const cargoGlows=[]; // animated emissive frames
+function addSmartCrate(x,z,w=4.2,h=2.3,d=3.2,colIdx=0){
+  const colors=[0x24505d,0x3a6671,0x5c4b3b,0x2a4a55];
+  const body=box(cargoGroup,w,h,d,new THREE.MeshStandardMaterial({color:colors[colIdx%4],roughness:.62,metalness:.35}),x,h/2,z);
+  // vertical ribs
+  for(let r=-w/2+0.4;r<=w/2-0.3;r+=0.7) box(cargoGroup,.04,h-0.15,.05,mats.white,x+r,h/2,z+d/2-0.02,false);
+  // roof
+  box(cargoGroup,w+.15,.1,d+.15,mats.roof,x,h+.05,z,false);
+  // cyan holographic edge frame (bottom + top)
+  const frameMat=mats.glowEdge;
+  const fw=w+0.12, fd=d+0.12;
+  // bottom rectangle
+  box(cargoGroup,fw,.04,.04,frameMat,x,0.04,z-fd/2,false);
+  box(cargoGroup,fw,.04,.04,frameMat,x,0.04,z+fd/2,false);
+  box(cargoGroup,.04,.04,fd,frameMat,x-fw/2,0.04,z,false);
+  box(cargoGroup,.04,.04,fd,frameMat,x+fw/2,0.04,z,false);
+  // top rectangle
+  box(cargoGroup,fw,.04,.04,frameMat,x,h+.08,z-fd/2,false);
+  box(cargoGroup,fw,.04,.04,frameMat,x,h+.08,z+fd/2,false);
+  box(cargoGroup,.04,.04,fd,frameMat,x-fw/2,h+.08,z,false);
+  box(cargoGroup,.04,.04,fd,frameMat,x+fw/2,h+.08,z,false);
+  // vertical corners
+  for(const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+    box(cargoGroup,.05,h+.1,.05,frameMat,x+sx*(w/2+0.04),h/2,z+sz*(d/2+0.04),false);
+  }
+  // holographic ID marker on top
+  const marker=box(cargoGroup,.9,.02,.9,mats.hologram,x,h+.18,z,false);
+  const core=new THREE.Mesh(new THREE.BoxGeometry(.35,.04,.35),mats.glowCyan);
+  core.position.set(x,h+.22,z);cargoGroup.add(core);
+  cargoGlows.push(core);
+  return body;
+}
+// Yard grid placement: cell ≈ 6 m, clearance ≥ 1.8 m, only inside YARD
+const CRATE_W = 4.0, CRATE_D = 3.0, CELL = 6.2;
+let crateIdx = 0;
+for (let ix = 0; ix < 4; ix++) {
+  for (let iz = 0; iz < 3; iz++) {
+    const x = -18 + ix * CELL;
+    const z = 13 + iz * CELL;
+    if (x < YARD.xMin || x > YARD.xMax || z < YARD.zMin || z > YARD.zMax) continue;
+    addSmartCrate(x, z, CRATE_W, 2.2, CRATE_D, crateIdx % 4);
+    registerStatic(x, z, CRATE_W / 2 + 0.3, CRATE_D / 2 + 0.3, `crate-${crateIdx}`);
+    crateIdx++;
+  }
+}
+// Forklifts — strictly inside YARD, away from lanes
+function forklift(x, z) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g);
+  box(g, 2.1, 1.1, 3, mats.orange, 0, 0.8, 0);
+  box(g, 1.2, 1.2, 1.4, mats.glass, 0, 1.8, -0.1);
+  box(g, 0.12, 2.7, 0.15, mats.white, 1, 1.5, 1.35);
+  box(g, 0.12, 2.7, 0.15, mats.white, 1.55, 1.5, 1.35);
+  box(g, 1.1, 0.12, 0.2, mats.white, 1.3, 0.25, 1.5);
+  for (const [wx, wz] of [[-0.8, -1], [0.8, -1], [-0.8, 1], [0.8, 1]]) {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.18, 12), mats.tire);
+    t.rotation.z = Math.PI / 2; t.position.set(wx, 0.35, wz); g.add(t);
+  }
+  registerStatic(x, z, 1.3, 1.8, `forklift@${x.toFixed(0)},${z.toFixed(0)}`);
+}
+forklift(-18, 26);
+forklift(18, 26);
+
+// ---------- Vehicles + IDM-lite traffic (P0) ----------
+const vehicleGroup = new THREE.Group(); world.add(vehicleGroup);
+const vehicles = [];
+const TRUCK_LEN = 11.5;   // approximate length used for gap checks
+const S0 = 7.0;           // min gap (m)
+const T_HEADWAY = 1.6;    // desired time headway (s)
+const V0 = 9.0;           // desired speed (m/s) at ×1
+const A_MAX = 2.2;        // max accel
+const B_COMF = 3.0;       // comfortable decel
+
+function makeTruck(i) {
+  const g = new THREE.Group(); vehicleGroup.add(g);
+  // Trailer
+  box(g, 3.1, 2.8, 8.1, i % 3 === 0 ? mats.white : mats.truck, 0, 2.1, -1.6);
+  for (let k = -3.5; k <= 2.5; k += 0.65) box(g, 0.045, 2.55, 0.045, mats.cyan, 1.57, 2.1, k - 1.6, false);
+  box(g, 2.85, 0.12, 7.7, mats.roof, 0, 3.56, -1.6);
+  // Cab
+  box(g, 2.65, 2.2, 2.1, i % 2 ? mats.orange : mats.white, 0, 1.8, 3.8);
+  box(g, 2.15, 0.9, 0.08, mats.glass, 0, 2.25, 4.87, false);
+  box(g, 2.5, 0.15, 0.12, mats.cyan, 0, 0.75, 4.9, false);
+  // Wheels (stored for rotation)
+  const wheels = [];
+  for (const wz of [-4, 0, 3.6]) for (const wx of [-1.52, 1.52]) {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.25, 16), mats.tire);
+    t.rotation.z = Math.PI / 2; t.position.set(wx, 0.52, wz); t.castShadow = true; g.add(t);
+    wheels.push(t);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.27, 12), mats.white);
+    hub.rotation.z = Math.PI / 2; hub.position.set(wx * 1.01, 0.52, wz); g.add(hub);
+  }
+  // Headlamps + brake lights
+  const headL = box(g, 0.45, 0.16, 0.08, new THREE.MeshBasicMaterial({ color: 0xffe9ba }), -0.8, 1.05, 4.9, false);
+  const headR = box(g, 0.45, 0.16, 0.08, new THREE.MeshBasicMaterial({ color: 0xffe9ba }), 0.8, 1.05, 4.9, false);
+  const brakeL = box(g, 0.35, 0.14, 0.06, new THREE.MeshBasicMaterial({ color: 0x330000 }), -1.1, 1.1, -5.7, false);
+  const brakeR = box(g, 0.35, 0.14, 0.06, new THREE.MeshBasicMaterial({ color: 0x330000 }), 1.1, 1.1, -5.7, false);
+  if (i % 3 === 0) {
+    const cabinLight = new THREE.PointLight(0x7adfff, 4.5, 9, 2);
+    cabinLight.position.set(0, 2.4, -1.2); g.add(cabinLight);
+    box(g, 2.6, 1.6, 0.06, new THREE.MeshBasicMaterial({ color: 0x4ec8e0, transparent: true, opacity: 0.22 }), 0, 2.0, -5.6, false);
+  }
+  // Warning sprite (hidden by default)
+  const warnMat = new THREE.MeshBasicMaterial({ color: 0xff2244, transparent: true, opacity: 0.85 });
+  const warn = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), warnMat);
+  warn.position.set(0, 5.2, 0); warn.visible = false; g.add(warn);
+
+  return {
+    group: g, wheels, brakeL, brakeR, warn,
+    route: 0, s: 0, v: V0 * 0.7, // arc-length position (m) and speed (m/s)
+    id: i
+  };
+}
+
+/*
+ * Routing engine v0.4 (P0)
+ * ------------------------
+ * - All routes are CLOSED loops (no ping-pong → no head-on meetings).
+ * - Each vehicle tracks arc-length coordinate `s` along its route.
+ * - Simplified Intelligent Driver Model (IDM) maintains safe gaps.
+ * - Initial placement: uniform spacing per route (s_k = k * L / N).
+ */
+const routeGroup = new THREE.Group(); world.add(routeGroup);
+
+// All routes closed. Secondary routes converted to small loops inside the yard perimeter.
+const routeCurves = [
+  // 0 – main one-way perimeter (primary circulatory road)
+  [[-62, 0.18, -44], [-62, 0.18, 36], [-50, 0.18, 44], [50, 0.18, 44], [62, 0.18, 36], [62, 0.18, -44], [50, 0.18, -48], [-50, 0.18, -48], [-62, 0.18, -44]],
+  // 1 – inner east-west service loop (closed)
+  [[-48, 0.2, -12], [48, 0.2, -12], [48, 0.2, 6], [-48, 0.2, 6], [-48, 0.2, -12]],
+  // 2 – inner north-south service loop (closed)
+  [[-14, 0.2, -40], [-14, 0.2, 36], [6, 0.2, 36], [6, 0.2, -40], [-14, 0.2, -40]],
+  // 3 – outer apron loop (closed)
+  [[-40, 0.2, 8], [40, 0.2, 8], [40, 0.2, 30], [-40, 0.2, 30], [-40, 0.2, 8]]
+];
+
+const routes = [];
+routeCurves.forEach((pts, i) => {
+  const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
+  curve.closed = true;
+  const len = curve.getLength();
+  const points = curve.getPoints(160);
+  const geom = new THREE.BufferGeometry().setFromPoints(points);
+  const lineObj = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: i === 0 ? 0xff9b43 : 0x54dbea, transparent: true, opacity: i === 0 ? 0.95 : 0.5 }));
+  routeGroup.add(lineObj);
+  const glow = new THREE.Mesh(new THREE.TubeGeometry(curve, 160, i === 0 ? 0.07 : 0.045, 6, true), new THREE.MeshBasicMaterial({ color: i === 0 ? 0xff8f38 : 0x37cfe3, transparent: true, opacity: i === 0 ? 0.42 : 0.28 }));
+  routeGroup.add(glow);
+  const marker = new THREE.Mesh(new THREE.SphereGeometry(i === 0 ? 0.32 : 0.24, 12, 10), new THREE.MeshBasicMaterial({ color: i === 0 ? 0xffc078 : 0x9af7ff }));
+  routeGroup.add(marker);
+  let halo = null;
+  if (i === 0) {
+    halo = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff9b43, transparent: true, opacity: 0.18 }));
+    routeGroup.add(halo);
+  }
+  routes.push({ curve, marker, halo, length: len, closed: true });
+});
+
+// Assign vehicles: 2 per route, uniformly spaced by arc-length
+const VEH_PER_ROUTE = 2;
+for (let r = 0; r < routes.length; r++) {
+  for (let k = 0; k < VEH_PER_ROUTE; k++) {
+    const v = makeTruck(r * VEH_PER_ROUTE + k);
+    v.route = r;
+    v.s = (k / VEH_PER_ROUTE) * routes[r].length; // uniform spacing
+    v.v = V0 * (0.75 + Math.random() * 0.2);
+    // place immediately
+    const u = (v.s / routes[r].length) % 1;
+    const p = routes[r].curve.getPointAt(u);
+    v.group.position.set(p.x, 0, p.z);
+    const tang = routes[r].curve.getTangentAt(u);
+    v.group.rotation.y = Math.atan2(tang.x, tang.z);
+    vehicles.push(v);
+  }
+}
+
+// IDM helper: desired gap
+function desiredGap(v, dv) {
+  return S0 + Math.max(0, v * T_HEADWAY + (v * dv) / (2 * Math.sqrt(A_MAX * B_COMF)));
+}
+
+// Find leader on same route (smallest positive forward gap)
+function findLeader(agent) {
+  const L = routes[agent.route].length;
+  let bestGap = Infinity, leader = null;
+  for (const other of vehicles) {
+    if (other === agent || other.route !== agent.route) continue;
+    let gap = (other.s - agent.s + L) % L;
+    if (gap < 0.01) gap = L; // treat almost-same as full lap behind
+    if (gap < bestGap) { bestGap = gap; leader = other; }
+  }
+  return { leader, gap: bestGap };
+}
+// Road edge markers and painted stop/crossing lines for the one-way perimeter (matches new wider loop).
+const roadMarkings=new THREE.Group();world.add(roadMarkings);
+for(let z=-42;z<=36;z+=4){box(roadMarkings,.12,.025,.65,mats.orange,-61,.14,z,false);box(roadMarkings,.12,.025,.65,mats.orange,61,.14,z,false)}
+for(let x=-50;x<=50;x+=4){box(roadMarkings,.65,.025,.12,mats.orange,x,.14,42,false);box(roadMarkings,.65,.025,.12,mats.orange,x,.14,-46,false)}
+// Direction chevrons on road surface — enforce one-way traffic rule.
+for(const [x,z,rot] of [[-61,0,0],[0,42,Math.PI/2],[61,0,Math.PI],[0,-46,-Math.PI/2]]){const arrow=new THREE.Group();arrow.position.set(x,.16,z);arrow.rotation.y=rot;roadMarkings.add(arrow);line(arrow,[[-.7,0,-.5],[0,0,.4],[.7,0,-.5]],0xffa04b,.9)}
+
+// IoT / signal field — denser network inspired by reference aerial view
+const signalGroup=new THREE.Group();world.add(signalGroup);
+const signalPositions=[];
+const signalBeads=[];
+for(let i=0;i<110;i++){
+ const x=(Math.random()-.5)*128,z=(Math.random()-.5)*88;
+ if(Math.abs(x)<52&&z>-6&&z<26)continue; // keep apron clearer
+ signalPositions.push([x,z]);
+ const bead=new THREE.Mesh(new THREE.SphereGeometry(i%6===0?.16:.1,8,6),new THREE.MeshBasicMaterial({color:i%5===0?0xff9b43:0x63e9f4,transparent:true,opacity:.8}));
+ bead.position.set(x,.14,z);signalGroup.add(bead);signalBeads.push(bead);
+ const beam=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,1.7+Math.random()*0.8,5),new THREE.MeshBasicMaterial({color:0x53dce9,transparent:true,opacity:.12}));
+ beam.position.set(x,1.0,z);signalGroup.add(beam);
+}
+// Richer telemetry mesh (more links, varied height)
+for(let i=0;i<36;i++){
+ const a=signalPositions[i%signalPositions.length];
+ const b=signalPositions[(i*11+23)%signalPositions.length];
+ if(a&&b){
+   const midY=1.8+Math.random()*2.2;
+   line(signalGroup,[[a[0],.25,a[1]],[(a[0]+b[0])/2,midY,(a[1]+b[1])/2],[b[0],.25,b[1]]],i%4===0?0xff9b43:0x4fcad9,.1+Math.random()*.08);
+ }
+}
+// Extra short links near cargo / apron for “local digital twin” density
+for(let i=0;i<12;i++){
+ const x=-20+Math.random()*40, z=12+Math.random()*18;
+ const bead=new THREE.Mesh(new THREE.SphereGeometry(.09,6,5),new THREE.MeshBasicMaterial({color:0x7af6ff,transparent:true,opacity:.7}));
+ bead.position.set(x,.2,z);signalGroup.add(bead);signalBeads.push(bead);
+}
+// floating coordinate labels
+function labelSprite(text,color='#8cecf5'){
+ const c=document.createElement('canvas');c.width=256;c.height=64;const ctx=c.getContext('2d');
+ ctx.fillStyle='rgba(4,20,30,.72)';ctx.fillRect(0,0,256,64);ctx.strokeStyle=color;ctx.strokeRect(1,1,254,62);
+ ctx.font='20px monospace';ctx.fillStyle=color;ctx.fillText(text,12,39);
+ const tex=new THREE.CanvasTexture(c);const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
+ const s=new THREE.Sprite(mat);s.scale.set(8,2,1);return s;
+}
+const labels=[];
+[['WH-01',-32,12,-22],['WH-02',14,14,-26],['WH-03',38,11,10],['GATE A',-55,4,0],['YARD / CARGO',0,6,22]].forEach(([t,x,y,z])=>{const s=labelSprite(t);s.position.set(x,y,z);world.add(s);labels.push(s)});
+// click selection via raycast
+const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();let selectedVehicle=3;
+function selectAt(e){
+  pointer.x=(e.clientX/innerWidth)*2-1;pointer.y=-(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(pointer,camera);
+  const hits=raycaster.intersectObjects(vehicleGroup.children,true);
+  if(hits.length){
+    let o=hits[0].object;
+    while(o.parent&&o.parent!==vehicleGroup)o=o.parent;
+    selectedVehicle=vehicleGroup.children.indexOf(o);
+    const agent=vehicles[selectedVehicle];
+    document.querySelector('#entity').textContent=`TRK-${String(selectedVehicle+1).padStart(2,'0')}`;
+    document.querySelector('#entityState').textContent='IN TRANSIT';
+    const kmh=agent?Math.round(agent.v*3.6):24;
+    document.querySelector('#velocity').textContent=`${kmh} km/h`;
+    toast(`Selected TRK-${String(selectedVehicle+1).padStart(2,'0')}`);
+  }
+}
+let down=null,dragging=false,button=0;
+canvas.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,theta,phi,target:target.clone()};dragging=false;button=e.button;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!down)return;const dx=e.clientX-down.x,dy=e.clientY-down.y;if(Math.abs(dx)+Math.abs(dy)>3)dragging=true;if(button===2||e.shiftKey){const scale=radius*.002;target.x=down.target.x-dx*scale;target.z=down.target.z+dy*scale}else{theta=down.theta-dx*.006;phi=down.phi+dy*.005}updateCamera()});
+canvas.addEventListener('pointerup',e=>{if(!dragging)selectAt(e);down=null});canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('wheel',e=>{radius=Math.max(25,Math.min(125,radius+e.deltaY*.055));updateCamera()},{passive:true});
+let playing=true,motion=true,gridOn=true,pulse=false,speed=1,simTime=24;
+let showCollisionWarnings=false;
+function toast(msg){const el=document.querySelector('#toast');el.textContent=msg;el.style.opacity=1;clearTimeout(el._timer);el._timer=setTimeout(()=>el.style.opacity=0,1500)}
+
+// Debug controls (P0)
+document.querySelector('#chkCollisions')?.addEventListener('change',e=>{
+  showCollisionWarnings=e.target.checked;
+  if(!showCollisionWarnings) vehicles.forEach(v=>v.warn.visible=false);
+  toast(showCollisionWarnings?'Collision warnings ON':'Collision warnings OFF');
+});
+document.querySelector('#btnValidate')?.addEventListener('click',()=>{
+  const v=validateStaticLayout();
+  if(v.length===0) toast('Layout OK — 0 violations');
+  else toast(`Layout issues: ${v.length} — ${v[0]}`);
+  console.info('validateStaticLayout()',v);
+});
+
+/* ---------- Floating panel system (drag + resize + hide/restore) ---------- */
+const panelState={};
+function makeFloating(id,restoreId){
+  const el=document.getElementById(id);
+  const restore=document.getElementById(restoreId);
+  if(!el)return;
+  panelState[id]={el,restore};
+  const head=el.querySelector('.panel-head,[data-drag]');
+  if(head){
+    let drag=null;
+    head.addEventListener('pointerdown',e=>{
+      if(e.target.closest('button'))return;
+      const r=el.getBoundingClientRect();
+      drag={x:e.clientX,y:e.clientY,left:r.left,top:r.top};
+      head.setPointerCapture(e.pointerId);
+    });
+    head.addEventListener('pointermove',e=>{
+      if(!drag)return;
+      el.style.left=(drag.left+e.clientX-drag.x)+'px';
+      el.style.top=(drag.top+e.clientY-drag.y)+'px';
+      el.style.right='auto';el.style.bottom='auto';
+      el.style.transform='none';
+    });
+    head.addEventListener('pointerup',()=>drag=null);
+  }
+  const grip=el.querySelector('.panel-grip,[data-resize]');
+  if(grip){
+    let rs=null;
+    grip.addEventListener('pointerdown',e=>{
+      e.preventDefault();e.stopPropagation();
+      rs={x:e.clientX,y:e.clientY,w:el.offsetWidth,h:el.offsetHeight};
+      grip.setPointerCapture(e.pointerId);
+    });
+    grip.addEventListener('pointermove',e=>{
+      if(!rs)return;
+      el.style.width=Math.max(180,Math.min(innerWidth*0.8,rs.w+e.clientX-rs.x))+'px';
+      if(id!=='panelBottom') el.style.height=Math.max(120,Math.min(innerHeight*0.85,rs.h+e.clientY-rs.y))+'px';
+    });
+    grip.addEventListener('pointerup',()=>rs=null);
+  }
+  const hideBtn=el.querySelector('[data-hide]');
+  if(hideBtn) hideBtn.addEventListener('click',()=>{el.hidden=true;if(restore)restore.hidden=false});
+  if(restore) restore.addEventListener('click',()=>{el.hidden=false;restore.hidden=true});
+}
+makeFloating('panelLeft','restoreLeft');
+makeFloating('panelRight','restoreRight');
+makeFloating('panelBottom','restoreBottom');
+makeFloating('panelCam','restoreCam');
+makeFloating('miniMap','mapRestore');
+
+/* ---------- Camera buttons ---------- */
+document.querySelectorAll('[data-camera]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-camera]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  if(b.dataset.camera==='top'){theta=0;phi=.12;radius=90}
+  else if(b.dataset.camera==='ground'){theta=.4;phi=1.36;radius=58}
+  else{theta=.78;phi=1.02;radius=68}
+  updateCamera();
+}));
+document.querySelector('#reset').onclick=()=>{theta=.78;phi=1.02;radius=68;target.set(0,0,0);updateCamera();toast('Camera reset')};
+const panStep=4;
+document.querySelector('#camZoomIn')?.addEventListener('click',()=>{radius=Math.max(25,radius-6);updateCamera()});
+document.querySelector('#camZoomOut')?.addEventListener('click',()=>{radius=Math.min(125,radius+6);updateCamera()});
+document.querySelector('#camLeft')?.addEventListener('click',()=>{target.x-=panStep;updateCamera()});
+document.querySelector('#camRight')?.addEventListener('click',()=>{target.x+=panStep;updateCamera()});
+document.querySelector('#camUp')?.addEventListener('click',()=>{target.z-=panStep;updateCamera()});
+document.querySelector('#camDown')?.addEventListener('click',()=>{target.z+=panStep;updateCamera()});
+
+document.querySelectorAll('[data-layer]').forEach(el=>el.addEventListener('change',()=>{layers[el.dataset.layer]=el.checked;const map={terrain:terrainGroup,buildings:buildingGroup,vehicles:vehicleGroup,routes:routeGroup,signals:signalGroup};map[el.dataset.layer].visible=el.checked;if(el.dataset.layer==='terrain'&&!gridOn)grid.visible=false;toast(`${el.dataset.layer.toUpperCase()} ${el.checked?'ON':'OFF'}`)}));
+document.querySelector('#play').onclick=()=>{playing=!playing;document.querySelector('#play').textContent=playing?'Ⅱ Pause':'▶ Play';toast(playing?'Simulation resumed':'Simulation paused')};
+document.querySelector('#toggleMotion').onclick=()=>{motion=!motion;document.querySelector('#toggleMotion').textContent=motion?'Pause motion':'Resume motion';toast(motion?'Vehicle motion resumed':'Vehicle motion paused')};
+document.querySelector('#pulse').onclick=()=>{pulse=!pulse;document.querySelector('#pulse').classList.toggle('active',pulse);toast(pulse?'Route pulse enabled':'Route pulse disabled')};
+document.querySelector('#speed').onclick=()=>{speed=speed===1?2:speed===2?4:1;document.querySelector('#speed').textContent=`×${speed}`};
+document.querySelector('#gridBtn').onclick=()=>{gridOn=!gridOn;grid.visible=gridOn&&layers.terrain;document.querySelector('#gridBtn').textContent=`Grid ${gridOn?'ON':'OFF'}`};
+document.querySelector('#time').addEventListener('input',e=>{simTime=+e.target.value;document.querySelector('#timeLabel').textContent=`T+00:${String(simTime).padStart(2,'0')}`});
+document.querySelectorAll('[data-scenario]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-scenario]').forEach(x=>x.classList.remove('active'));b.classList.add('active');const s=b.dataset.scenario;const names={balanced:['Balanced flow','42 / h','LOW','72%'],surge:['Demand surge','68 / h','MEDIUM','91%'],disruption:['Route disruption','19 / h','HIGH','54%']};const v=names[s];document.querySelector('#scenarioName').textContent=v[0];document.querySelector('#dispatch').textContent=v[1];document.querySelector('#risk').textContent=v[2];document.querySelector('#risk').style.color=s==='disruption'?'#ff9b43':s==='surge'?'#ffe08a':'#8ff0c0';document.querySelector('#util').textContent=v[3];document.querySelector('#utilbar').style.width=v[3];toast(`Scenario: ${v[0]}`)}));
+// Day/night lighting mode. Night is the default cinematic look; day increases ambient fill.
+let isNight=true;
+const ambient=scene.children.find(o=>o.isHemisphereLight);
+const emissiveMats=[];
+function setLighting(){
+ scene.background.set(isNight?'#071722':'#9bb7c3');scene.fog.color.set(isNight?'#071722':'#9bb7c3');scene.fog.density=isNight?.0145:.004;
+ ambient.intensity=isNight?2.1:3.0;key.intensity=isNight?3.2:4.2;rim.intensity=isNight?2.2:.8;orangeLight.intensity=isNight?32:5;
+ renderer.toneMappingExposure=isNight?1.2:1.35;
+ document.querySelector('#dayNight').textContent=isNight?'☾ Night':'☀ Day';document.querySelector('#dayNight').classList.toggle('active',!isNight);
+ // Night work lights and cyan perimeter luminaires.
+ workLights.forEach(l=>l.visible=isNight);yardLamps.forEach(m=>m.visible=isNight);
+}
+const workLights=[];const yardLamps=[];
+for(const [x,z] of [[-50,-9],[-25,-9],[0,-9],[25,-9],[50,-9],[-50,30],[0,30],[50,30]]){
+ const lamp=new THREE.PointLight(0x7adff5,isNight?9:0,19,2);lamp.position.set(x,5,z);lamp.castShadow=false;scene.add(lamp);workLights.push(lamp);
+ const bulb=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),new THREE.MeshBasicMaterial({color:0x9df5ff}));bulb.position.set(x,5,z);world.add(bulb);yardLamps.push(bulb);
+}
+document.querySelector('#dayNight').addEventListener('click',()=>{isNight=!isNight;setLighting();toast(isNight?'Night lighting enabled':'Day lighting enabled')});setLighting();
+// Fullscreen scene, with a fallback notice when browser permissions/platform do not allow it.
+document.querySelector('#fullscreen').addEventListener('click',async()=>{try{if(!document.fullscreenElement){await document.documentElement.requestFullscreen();document.querySelector('#fullscreen').textContent='⛶ Exit fullscreen'}else{await document.exitFullscreen();document.querySelector('#fullscreen').textContent='⛶ Fullscreen'}}catch(e){toast('Fullscreen is not available in this browser')}});
+document.addEventListener('fullscreenchange',()=>{document.querySelector('#fullscreen').textContent=document.fullscreenElement?'⛶ Exit fullscreen':'⛶ Fullscreen'});
+// Draggable/resizable minimap. Imported image is shown as a base layer beneath the synthetic territory plan.
+const mini=document.querySelector('#miniMap'),mapHead=document.querySelector('#mapHead'),mapCanvas=document.querySelector('#mapCanvas'),mapCtx=mapCanvas.getContext('2d');let mapImage=null,mapVisible=true,mapLarge=false;
+function mapXY(x,z){return {x:(x+75)/150*mapCanvas.width,y:(z+55)/110*mapCanvas.height}}
+function drawMap(){const w=mapCanvas.width,h=mapCanvas.height;mapCtx.clearRect(0,0,w,h);mapCtx.fillStyle='#071923';mapCtx.fillRect(0,0,w,h);
+ if(mapImage){mapCtx.globalAlpha=.55;mapCtx.drawImage(mapImage,0,0,w,h);mapCtx.globalAlpha=1}
+ mapCtx.strokeStyle='#183e4b';mapCtx.lineWidth=1;for(let x=0;x<w;x+=16){mapCtx.beginPath();mapCtx.moveTo(x,0);mapCtx.lineTo(x,h);mapCtx.stroke()}for(let y=0;y<h;y+=16){mapCtx.beginPath();mapCtx.moveTo(0,y);mapCtx.lineTo(w,y);mapCtx.stroke()}
+ // warehouse footprints
+ // warehouse footprints (match 3D positions, clear of roads)
+ const rects=[[-48,-31,32,18],[-4,-37,36,22],[26,1,24,18]];mapCtx.fillStyle='#294650';mapCtx.strokeStyle='#66dbe7';rects.forEach(([x,z,rw,rd])=>{const a=mapXY(x,z),b=mapXY(x+rw,z+rd);mapCtx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);mapCtx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y)});
+ // perimeter driving loop (updated wider clear path)
+ mapCtx.strokeStyle='#ff9b43';mapCtx.lineWidth=2;mapCtx.beginPath();[[-62,-44],[-62,36],[-50,44],[50,44],[62,36],[62,-44],[50,-48],[-50,-48],[-62,-44]].forEach(([x,z],i)=>{const p=mapXY(x,z);i?mapCtx.lineTo(p.x,p.y):mapCtx.moveTo(p.x,p.y)});mapCtx.stroke();
+ // moving trucks and heading ticks
+ vehicles.forEach((v,i)=>{const p=mapXY(v.group.position.x,v.group.position.z);mapCtx.fillStyle=i===selectedVehicle?'#fff2bd':'#ff9b43';mapCtx.beginPath();mapCtx.arc(p.x,p.y,i===selectedVehicle?4:2.8,0,Math.PI*2);mapCtx.fill();if(i===selectedVehicle){mapCtx.strokeStyle='#fff2bd';mapCtx.strokeRect(p.x-6,p.y-6,12,12)}});
+ // camera target indicator
+ const c=mapXY(target.x,target.z);mapCtx.strokeStyle='#6ce8f1';mapCtx.beginPath();mapCtx.arc(c.x,c.y,5,0,Math.PI*2);mapCtx.stroke();mapCtx.fillStyle='#9cecf4';mapCtx.font='9px monospace';mapCtx.fillText('SDT5D',7,13);
+}
+function resizeMap(){mapCanvas.width=320;mapCanvas.height=210;drawMap()}
+// Mini-map specific controls (drag/resize handled by makeFloating)
+document.querySelector('#mapHide')?.addEventListener('click',()=>{mini.hidden=true;document.querySelector('#mapRestore').hidden=false;mapVisible=false});
+document.querySelector('#mapRestore')?.addEventListener('click',()=>{mini.hidden=false;document.querySelector('#mapRestore').hidden=true;mapVisible=true});
+document.querySelector('#mapResize')?.addEventListener('click',()=>{mapLarge=!mapLarge;mini.style.width=mapLarge?'min(520px,75vw)':'300px';mapCanvas.style.height=mapLarge?'300px':'180px';drawMap()});
+document.querySelector('#mapUploadBtn')?.addEventListener('click',()=>document.querySelector('#mapUpload').click());
+document.querySelector('#mapUpload')?.addEventListener('change',e=>{const file=e.target.files?.[0];if(!file)return;const url=URL.createObjectURL(file);const img=new Image();img.onload=()=>{mapImage=img;drawMap();URL.revokeObjectURL(url);toast('Map image loaded')};img.onerror=()=>toast('Could not load map image');img.src=url});
+setInterval(drawMap,100);resizeMap();
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+let last=performance.now(),frames=0,fpsTime=0;
+function animate(now){requestAnimationFrame(animate);const dt=Math.min(.05,(now-last)/1000);last=now;frames++;fpsTime+=dt;if(fpsTime>1){document.querySelector('#fps').textContent=Math.round(frames/fpsTime);frames=0;fpsTime=0}
+ const t=now*.000055*speed+(playing?simTime*.0015:0);
+ document.querySelector('#clock').textContent=new Date().toISOString().slice(11,19);
+ if(playing){simTime=(simTime+dt*speed*1.4)%100;document.querySelector('#time').value=simTime;document.querySelector('#timeLabel').textContent=`T+00:${String(Math.floor(simTime)).padStart(2,'0')}`}
+ // --- IDM-lite vehicle update (P0) ---
+ if (motion) {
+   const dtMot = dt * speed;
+   // First pass: compute accelerations from leaders
+   const accels = vehicles.map(agent => {
+     const { leader, gap } = findLeader(agent);
+     const dv = leader ? agent.v - leader.v : 0;
+     const sStar = desiredGap(agent.v, dv);
+     const free = 1 - Math.pow(agent.v / (V0 * speed * 0.35 + 0.01), 4);
+     const interact = leader ? Math.pow(sStar / Math.max(gap - TRUCK_LEN, 0.5), 2) : 0;
+     return A_MAX * (free - interact);
+   });
+   // Second pass: integrate and place
+   vehicles.forEach((agent, idx) => {
+     const a = Math.max(-B_COMF * 1.5, Math.min(A_MAX, accels[idx]));
+     agent.v = Math.max(0.3, agent.v + a * dtMot);
+     const route = routes[agent.route];
+     agent.s = (agent.s + agent.v * dtMot) % route.length;
+     const u = agent.s / route.length;
+     const p = route.curve.getPointAt(u);
+     agent.group.position.set(p.x, 0, p.z);
+     const tang = route.curve.getTangentAt(Math.max(0.001, Math.min(0.999, u)));
+     agent.group.rotation.y = Math.atan2(tang.x, tang.z);
+     // Wheel rotation proportional to distance travelled
+     const dRot = (agent.v * dtMot) / 0.48;
+     agent.wheels.forEach(w => { w.rotation.x += dRot; });
+     // Brake lights when decelerating
+     const braking = a < -0.4;
+     agent.brakeL.material.color.set(braking ? 0xff2222 : 0x330000);
+     agent.brakeR.material.color.set(braking ? 0xff2222 : 0x330000);
+     // Collision warning
+     const { gap } = findLeader(agent);
+     const warn = showCollisionWarnings && gap < S0 + TRUCK_LEN;
+     agent.warn.visible = warn;
+   });
+ }
+ // Route markers
+ routes.forEach((r, i) => {
+   const u = (t * 0.25 + i * 0.17) % 1;
+   const pt = r.curve.getPointAt(u);
+   r.marker.position.copy(pt);
+   const pulseScale = pulse ? 1.6 + Math.sin(now * 0.012 + i) * 0.55 : 1 + Math.sin(now * 0.006 + i) * 0.15;
+   r.marker.scale.setScalar(pulseScale);
+   r.marker.material.color.set(i === 0 ? 0xffb05b : 0x8cf6ff);
+   if (r.halo) {
+     r.halo.position.copy(pt);
+     r.halo.scale.setScalar(pulseScale * 1.1);
+     r.halo.material.opacity = 0.12 + 0.08 * Math.sin(now * 0.01 + i);
+   }
+ });
+ // Subtle breathing glow on smart-crate markers
+ cargoGlows.forEach((g, i) => { g.material.opacity = 0.7 + 0.25 * Math.sin(now * 0.004 + i * 1.3); });
+ orangeLight.intensity = pulse ? 58 : 34;
+ renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
